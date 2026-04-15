@@ -9,227 +9,244 @@
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
   <style>
+    /* ----- GLOBAL RESET & BASE ----- */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: #000;
-      color: #eee;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
       font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
     }
-    body.upload-mode {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow-x: hidden;
-      overflow-y: auto;
-    }
-    body.game-mode { overflow: hidden; }
 
-    /* ── Upload / Loader screen ── */
+    /* UPLOAD SCREEN — fixed, perfectly centered (like the reference loader) */
     #upload-screen {
-      text-align: center;
-      padding: 2em 1.25em;
-      max-width: 520px;
-      width: 100%;
-      min-height: 100vh;
+      position: fixed;
+      inset: 0;
+      background: #000;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: .5em;
+      z-index: 1000;
+      text-align: center;
+      padding: 2em;
     }
 
+    /* Heading style (centered) */
     #upload-screen h1 {
-      font-size: 1.6em;
+      font-size: 2rem;
       font-weight: 700;
       color: #fff;
-      letter-spacing: .01em;
-      margin-bottom: .15em;
+      letter-spacing: 0.05em;
+      margin-bottom: 24px;
+      animation: rainbow-pulse 2s ease-in-out infinite;
     }
 
+    /* Fun rainbow pulse (as in your example, keeps the loading vibe) */
+    @keyframes rainbow-pulse {
+      0% { color: #ff0000; transform: scale(1); }
+      16.66% { color: #ff8800; transform: scale(1.05); }
+      33.33% { color: #ffff00; transform: scale(1); }
+      50% { color: #00ff00; transform: scale(1.05); }
+      66.66% { color: #0088ff; transform: scale(1); }
+      83.33% { color: #8800ff; transform: scale(1.05); }
+      100% { color: #ff0000; transform: scale(1); }
+    }
+
+    /* GIF image – centered */
     #ritsu-gif {
       width: 200px;
       height: 200px;
       margin-bottom: 24px;
       display: block;
+      margin-left: auto;
+      margin-right: auto;
     }
 
-    /* project links */
+    /* Project links (optional, but centered) */
     #project-links {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: .75em;
-      font-size: .82em;
-      margin-bottom: .25em;
+      gap: 0.75em;
+      font-size: 0.82em;
+      margin: 0.5em 0 0.25em;
     }
     #project-links a { color: #ff79c6; text-decoration: underline; }
     #project-links a:hover { color: #fff; }
 
+    /* Text paragraphs */
     #upload-screen p {
-      font-size: .83em;
+      font-size: 0.83em;
       color: #888;
       line-height: 1.5;
     }
     #upload-screen p strong { color: #ccc; }
 
-    /* ── file rows ── */
+    /* File rows (progress) – centered inside flex column */
     .file-row {
       display: flex;
       align-items: baseline;
-      gap: .5em;
-      font-size: .88em;
-      margin: .15em 0;
+      gap: 0.5em;
+      font-size: 0.88em;
+      margin: 0.15em 0;
+      justify-content: center;
     }
     .file-name  { color: #ff79c6; font-weight: 600; white-space: nowrap; }
     .file-status {
       color: #ffeb3b;
-      font-size: .85em;
+      font-size: 0.85em;
       white-space: nowrap;
     }
     .file-status.done  { color: #00e676; }
     .file-status.error { color: #ff5555; }
 
-    /* resource progress wrapper */
+    /* Resource wrapper – center contents */
     #server-load-wrap {
-      width: 100%;
+      width: auto;
+      max-width: 90vw;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: .1em;
-      margin: .5em 0;
+      gap: 0.1em;
+      margin: 0.5em 0;
     }
 
     #resources-ready-msg {
       display: none;
       color: #00e676;
-      font-size: .88em;
+      font-size: 0.88em;
       font-weight: 600;
-      margin-top: .35em;
+      margin-top: 0.35em;
     }
 
-    /* loading inline status */
+    /* Loading status message */
     #loading-drop-zone {
       display: none;
-      font-size: .82em;
+      font-size: 0.82em;
       color: #ffeb3b;
-      margin-top: .4em;
+      margin-top: 0.4em;
     }
     #loading-drop-zone.has-error { color: #ff5555; }
 
-    /* ── Launch button (hidden but kept for fallback, auto-start will trigger) ── */
+    /* Hidden launch button (kept for compatibility) */
     #launch-btn {
       display: none;
-      margin-top: .75em;
-      background: #000;
-      color: #ff79c6;
-      border: 2px solid #ff79c6;
-      border-radius: 8px;
-      padding: .6em 2em;
-      font-family: inherit;
-      font-size: .95em;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background .15s, color .15s;
     }
-    #launch-btn:hover { background: #ff79c6; color: #000; }
-    #launch-btn:disabled { opacity: .4; cursor: default; }
 
-    /* ── Save action buttons (upload screen) ── */
+    /* Save actions row (Export/Import/Clear) – centered */
     #upload-save-actions {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: .5em;
-      margin-top: .5em;
+      gap: 0.5em;
+      margin-top: 1em;
     }
     #upload-save-actions button {
       background: #000;
       color: #aaa;
       border: 1px solid #333;
       border-radius: 6px;
-      padding: .45em .9em;
+      padding: 0.45em 0.9em;
       font-family: inherit;
-      font-size: .78em;
+      font-size: 0.78em;
       cursor: pointer;
-      transition: border-color .15s, color .15s;
+      transition: border-color 0.15s, color 0.15s;
     }
     #upload-save-actions button:hover { border-color: #ff79c6; color: #ff79c6; }
-    #upload-save-actions button:disabled { opacity: .4; cursor: default; }
+    #upload-save-actions button:disabled { opacity: 0.4; cursor: default; }
 
-    /* ── Game canvas ── */
+    /* ── GAME CANVAS CONTAINER (full screen, centered) ── */
     #canvas-container {
-      display: none;
-      width: 100vw;
-      height: 100vh;
+      display: none;  /* hidden until game starts */
       position: fixed;
       inset: 0;
+      width: 100vw;
+      height: 100vh;
       justify-content: center;
       align-items: center;
       background: #000;
       overflow: hidden;
+      z-index: 10;
     }
     canvas#canvas {
       display: block;
       background: #000;
       outline: 0;
+      box-shadow: 0 0 0 2px #2a2a2a;
     }
 
+    /* Hidden textarea for soft keyboard (no layout impact) */
     #pvz-soft-keyboard {
-      position: fixed; top: 0; left: 0;
-      width: 1px; height: 1px;
-      padding: 0; border: 0;
-      opacity: 0; resize: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      border: 0;
+      opacity: 0;
+      resize: none;
       pointer-events: none;
       font-size: 16px;
     }
 
-    /* ── In-game save toolbar (now with IMPORT button alongside EXPORT) ── */
+    /* In-game save toolbar (positioned at top-right) */
     #save-toolbar {
       position: absolute;
-      top: 8px; right: 8px;
+      top: 8px;
+      right: 8px;
       display: flex;
       gap: 6px;
-      z-index: 10;
+      z-index: 20;
       flex-wrap: wrap;
       justify-content: flex-end;
       max-width: calc(100vw - 16px);
     }
     #save-toolbar button {
-      background: rgba(0,0,0,.7);
+      background: rgba(0,0,0,0.7);
       color: #ff79c6;
       border: 1px solid #ff79c6;
       border-radius: 6px;
-      padding: .35em .8em;
+      padding: 0.35em 0.8em;
       font-family: inherit;
-      font-size: .82em;
+      font-size: 0.82em;
       cursor: pointer;
       backdrop-filter: blur(4px);
-      transition: background .2s;
+      transition: background 0.2s;
     }
-    #save-toolbar button:hover { background: rgba(255,121,198,.15); }
-    #save-toolbar button:disabled { opacity: .4; cursor: default; }
+    #save-toolbar button:hover { background: rgba(255,121,198,0.15); }
+    #save-toolbar button:disabled { opacity: 0.4; cursor: default; }
 
-    @media (max-height: 700px), (max-width: 600px) {
-      body.upload-mode { justify-content: flex-start; }
-      #upload-screen { padding: 1.25em 1em 2em; justify-content: flex-start; }
+    /* Responsive: smaller screens – keep centering but adjust gif size */
+    @media (max-width: 600px), (max-height: 700px) {
       #ritsu-gif { width: 120px; height: 120px; margin-bottom: 16px; }
+      #upload-screen h1 { font-size: 1.6rem; margin-bottom: 16px; }
+      #upload-screen { padding: 1.25em; }
+      .file-row { font-size: 0.75em; gap: 0.3em; }
     }
   </style>
 </head>
-<body class="upload-mode" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 0;">
+<body>
 
+<!-- UPLOAD / LOADER SCREEN (fixed, centered) -->
 <div id="upload-screen">
-  <h1>loading :3 </h1>
+  <h1>loading :3</h1>
   <img id="ritsu-gif" src="./ritsu.gif" alt="ritsu" width="200" height="200" style="margin-bottom: 24px;">
+  
   <!-- file-row progress entries injected by JS -->
   <div id="server-load-wrap"></div>
 
   <p id="resources-ready-msg">all resources ready</p>
   <div id="loading-drop-zone"></div>
 
+  <!-- hidden save action buttons (for completeness, not shown unless needed) -->
+  <div id="upload-save-actions" style="display: none;"></div>
+</div>
+
+<!-- CANVAS CONTAINER (game screen, initially hidden) -->
 <div id="canvas-container">
   <div id="save-toolbar">
     <button id="save-export-btn">Export Saves</button>
@@ -237,6 +254,7 @@
   </div>
   <canvas id="canvas" width="800" height="600" tabindex="0"></canvas>
 </div>
+
 <textarea id="pvz-soft-keyboard" autocapitalize="off" autocomplete="off" autocorrect="off" enterkeyhint="done" spellcheck="false"></textarea>
 
 <!-- hidden file input used by in-game import button -->
@@ -260,8 +278,8 @@ var Module = {
 // ----------------------------------------------------------------------
 // PvZ Portable Loader — AUTO-START MODE + IN-GAME IMPORT BUTTON
 // - Automatically starts game once resources + WASM are ready.
-// - Adds an "Import Saves (ZIP)" button right next to "Export Saves" inside the game.
-// - All save operations (export, import, clear) share same IndexedDB backend.
+// - All save operations (export, import) share same IndexedDB backend.
+// - Upload screen is perfectly centered via fixed positioning.
 // ----------------------------------------------------------------------
 
 const PAK_PARTS = ["main.pak.part0","main.pak.part1","main.pak.part2"];
@@ -286,19 +304,15 @@ let autoStartTriggered = false;
 const serverLoadWrap   = document.getElementById("server-load-wrap");
 const loadStatus       = document.getElementById("loading-drop-zone");
 const resourcesReadyMsg= document.getElementById("resources-ready-msg");
-const launchBtn        = document.getElementById("launch-btn");
-const uploadSaveImportBtn    = document.getElementById("upload-save-import-btn");
-const uploadSaveImportDirBtn = document.getElementById("upload-save-import-dir-btn");
-const uploadSaveClearBtn     = document.getElementById("upload-save-clear-btn");
-const uploadSaveImportInput    = document.getElementById("upload-save-import-input");
-const uploadSaveImportDirInput = document.getElementById("upload-save-import-dir-input");
+const uploadScreen     = document.getElementById("upload-screen");
+const canvasContainer  = document.getElementById("canvas-container");
 
 // In-game elements
 const ingameExportBtn = document.getElementById("save-export-btn");
 const ingameImportBtn = document.getElementById("save-import-btn");
 const ingameFileInput = document.getElementById("ingame-save-import-input");
 
-// ── File-row UI helpers ──────────────────────────────────────────────────
+// ── File-row UI helpers (creates centered rows) ─────────────────────────
 function makeFileRow(label) {
   const row = document.createElement("div");
   row.className = "file-row";
@@ -415,9 +429,11 @@ async function syncSaves(){
 }
 function startSaveAutosync(){ if(saveSyncIntervalId === null) saveSyncIntervalId = setInterval(syncSaves, 5000); }
 
-// ── Canvas resize ────────────────────────────────────────────────────────
+// ── Canvas resize (keep aspect ratio) ────────────────────────────────────
 function resizeCanvas(){
-  const c = document.getElementById("canvas"), ct = document.getElementById("canvas-container");
+  const c = document.getElementById("canvas");
+  const ct = canvasContainer;
+  if (!c || !ct) return;
   const s = Math.min(ct.clientWidth / c.width, ct.clientHeight / c.height);
   c.style.width = Math.floor(c.width * s) + "px";
   c.style.height = Math.floor(c.height * s) + "px";
@@ -435,7 +451,6 @@ function tryAutoStart() {
 async function startGame() {
   if(gameStarted) return;
   if(!allResourcesReady) return;
-  if(launchBtn) launchBtn.disabled = true;
   loadStatus.textContent = "preparing WebAssembly runtime & resources…";
   loadStatus.classList.remove("has-error");
   loadStatus.style.display = "block";
@@ -460,10 +475,10 @@ async function startGame() {
     }
     loadStatus.textContent = "restoring saved data…";
     await ensureSaveFsReady();
-    document.body.classList.replace("upload-mode", "game-mode");
-    document.getElementById("upload-screen").style.display = "none";
-    const cc = document.getElementById("canvas-container");
-    cc.style.display = "flex";
+    
+    // Switch UI: hide fixed upload screen, show fullscreen canvas
+    uploadScreen.style.display = "none";
+    canvasContainer.style.display = "flex";
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
     loadStatus.style.display = "none";
@@ -475,10 +490,8 @@ async function startGame() {
     console.error("Failed to start game:", e);
     loadStatus.textContent = "Error: " + (e.message || e);
     loadStatus.classList.add("has-error");
-    document.getElementById("canvas-container").style.display = "none";
-    document.getElementById("upload-screen").style.display = "";
-    document.body.classList.replace("game-mode", "upload-mode");
-    if(launchBtn) launchBtn.disabled = false;
+    canvasContainer.style.display = "none";
+    uploadScreen.style.display = "flex";
     autoStartTriggered = false;
   }
 }
@@ -496,7 +509,7 @@ window.moduleReadyPromise.then(() => {
 
 fetchAllResources();
 
-// ── CORE SAVE MANAGEMENT (Export, Import ZIP, Clear) ─────────────────────
+// ── CORE SAVE MANAGEMENT (Export, Import ZIP) ────────────────────────────
 function collectSaveFiles(baseDir) {
   const results = [];
   let items;
@@ -581,66 +594,7 @@ async function importSavesFromZip(zipFile, buttonEl) {
   }
 }
 
-async function clearAllSaves(buttonEl) {
-  if(!gameStarted) { alert("Game not started."); return; }
-  if(!confirm("⚠️ This will permanently delete ALL save data from your browser for this game.\nThis action cannot be undone. Continue?")) return;
-  buttonEl.disabled = true;
-  const original = buttonEl.textContent;
-  buttonEl.textContent = "⏳ Clearing…";
-  try {
-    await ensureSaveFsReady();
-    const files = collectSaveFiles("/saves");
-    for(const f of files) {
-      try { Module.FS.unlink(f); } catch(e) {}
-    }
-    function rmdirRecursive(d) {
-      let list;
-      try { list = Module.FS.readdir(d); } catch(e) { return; }
-      for(const entry of list) {
-        if(entry === "." || entry === "..") continue;
-        const p = d + "/" + entry;
-        try {
-          const st = Module.FS.stat(p);
-          if(Module.FS.isDir(st.mode)) rmdirRecursive(p);
-          else Module.FS.unlink(p);
-        } catch(e) {}
-      }
-      if(d !== "/saves") try { Module.FS.rmdir(d); } catch(e) {}
-    }
-    rmdirRecursive("/saves");
-    try { Module.FS.mkdir("/saves"); } catch(e) {}
-    try { Module.FS.mkdir("/saves/userdata"); } catch(e) {}
-    await syncSaves();
-    alert("All save data has been cleared.");
-  } catch(err) {
-    console.error("Clear failed:", err);
-    alert("Clear failed: " + err.message);
-  } finally {
-    buttonEl.disabled = false;
-    buttonEl.textContent = original;
-  }
-}
-
-// ── Attach event handlers for upload screen + in-game toolbar ────────────
-// Upload screen handlers (preserved)
-uploadSaveImportBtn.addEventListener("click", () => uploadSaveImportInput.click());
-uploadSaveImportInput.addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if(file && gameStarted) await importSavesFromZip(file, uploadSaveImportBtn);
-  else if(file && !gameStarted) alert("Game is not running yet. Please wait for game to start before importing saves.");
-  e.target.value = "";
-});
-uploadSaveImportDirBtn.addEventListener("click", () => uploadSaveImportDirInput.click());
-uploadSaveImportDirInput.addEventListener("change", async e => {
-  const files = Array.from(e.target.files);
-  if(files.length && gameStarted) {
-    alert("Folder import (multiple files) not directly supported for in-game. Please use ZIP import for simplicity.");
-  } else if(files.length && !gameStarted) alert("Game not running.");
-  e.target.value = "";
-});
-uploadSaveClearBtn.addEventListener("click", () => { if(gameStarted) clearAllSaves(uploadSaveClearBtn); else alert("Wait for game to start."); });
-
-// In-game buttons
+// ── Attach event handlers for in-game toolbar ────────────────────────────
 ingameExportBtn.addEventListener("click", () => exportSaves(ingameExportBtn));
 ingameImportBtn.addEventListener("click", () => ingameFileInput.click());
 ingameFileInput.addEventListener("change", async e => {
@@ -667,12 +621,10 @@ window.onGameExit = function() {
   gameStarted = false;
   if(saveSyncIntervalId !== null) { clearInterval(saveSyncIntervalId); saveSyncIntervalId = null; }
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
-  document.getElementById("canvas-container").style.display = "none";
-  document.getElementById("upload-screen").style.display = "";
-  document.body.classList.replace("game-mode", "upload-mode");
+  canvasContainer.style.display = "none";
+  uploadScreen.style.display = "flex";
   window.removeEventListener("resize", resizeCanvas);
   loadStatus.style.display = "none";
-  if(launchBtn) launchBtn.disabled = false;
   if(!runtimeReloadScheduled) {
     runtimeReloadScheduled = true;
     loadStatus.textContent = "Resetting WebAssembly runtime…";
