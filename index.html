@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PvZ Portable — Web (Auto-launch)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #eee;
+      font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+    }
+    body.upload-mode {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    body.game-mode { overflow: hidden; }
+
+    /* ── Upload / Loader screen ── */
+    #upload-screen {
+      text-align: center;
+      padding: 2em 1.25em;
+      max-width: 520px;
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .5em;
+    }
+
+    #upload-screen h1 {
+      font-size: 1.6em;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .01em;
+      margin-bottom: .15em;
+    }
+
+    #ritsu-gif {
+      width: 200px;
+      height: 200px;
+      margin-bottom: 24px;
+      display: block;
+    }
+
+    /* project links */
+    #project-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .75em;
+      font-size: .82em;
+      margin-bottom: .25em;
+    }
+    #project-links a { color: #ff79c6; text-decoration: underline; }
+    #project-links a:hover { color: #fff; }
+
+    #upload-screen p {
+      font-size: .83em;
+      color: #888;
+      line-height: 1.5;
+    }
+    #upload-screen p strong { color: #ccc; }
+
+    /* ── file rows ── */
+    .file-row {
+      display: flex;
+      align-items: baseline;
+      gap: .5em;
+      font-size: .88em;
+      margin: .15em 0;
+    }
+    .file-name  { color: #ff79c6; font-weight: 600; white-space: nowrap; }
+    .file-status {
+      color: #ffeb3b;
+      font-size: .85em;
+      white-space: nowrap;
+    }
+    .file-status.done  { color: #00e676; }
+    .file-status.error { color: #ff5555; }
+
+    /* resource progress wrapper */
+    #server-load-wrap {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .1em;
+      margin: .5em 0;
+    }
+
+    #resources-ready-msg {
+      display: none;
+      color: #00e676;
+      font-size: .88em;
+      font-weight: 600;
+      margin-top: .35em;
+    }
+
+    /* loading inline status */
+    #loading-drop-zone {
+      display: none;
+      font-size: .82em;
+      color: #ffeb3b;
+      margin-top: .4em;
+    }
+    #loading-drop-zone.has-error { color: #ff5555; }
+
+    /* ── Launch button (hidden but kept for fallback, auto-start will trigger) ── */
+    #launch-btn {
+      display: none;
+      margin-top: .75em;
+      background: #000;
+      color: #ff79c6;
+      border: 2px solid #ff79c6;
+      border-radius: 8px;
+      padding: .6em 2em;
+      font-family: inherit;
+      font-size: .95em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    #launch-btn:hover { background: #ff79c6; color: #000; }
+    #launch-btn:disabled { opacity: .4; cursor: default; }
+
+    /* ── Save action buttons ── */
+    #upload-save-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .5em;
+      margin-top: .5em;
+    }
+    #upload-save-actions button {
+      background: #000;
+      color: #aaa;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: .45em .9em;
+      font-family: inherit;
+      font-size: .78em;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    #upload-save-actions button:hover { border-color: #ff79c6; color: #ff79c6; }
+    #upload-save-actions button:disabled { opacity: .4; cursor: default; }
+
+    /* ── Game canvas ── */
+    #canvas-container {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      inset: 0;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas#canvas {
+      display: block;
+      background: #000;
+      outline: 0;
+    }
+
+    #pvz-soft-keyboard {
+      position: fixed; top: 0; left: 0;
+      width: 1px; height: 1px;
+      padding: 0; border: 0;
+      opacity: 0; resize: none;
+      pointer-events: none;
+      font-size: 16px;
+    }
+
+    /* ── In-game save toolbar ── */
+    #save-toolbar {
+      position: absolute;
+      top: 8px; right: 8px;
+      display: flex;
+      gap: 6px;
+      z-index: 10;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: calc(100vw - 16px);
+    }
+    #save-toolbar button {
+      background: rgba(0,0,0,.7);
+      color: #ff79c6;
+      border: 1px solid #ff79c6;
+      border-radius: 6px;
+      padding: .35em .8em;
+      font-family: inherit;
+      font-size: .82em;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: background .2s;
+    }
+    #save-toolbar button:hover { background: rgba(255,121,198,.15); }
+    #save-toolbar button:disabled { opacity: .4; cursor: default; }
+
+    @media (max-height: 700px), (max-width: 600px) {
+      body.upload-mode { justify-content: flex-start; }
+      #upload-screen { padding: 1.25em 1em 2em; justify-content: flex-start; }
+      #ritsu-gif { width: 120px; height: 120px; margin-bottom: 16px; }
+    }
+  </style>
+</head>
+<body class="upload-mode">
+
+<div id="upload-screen">
+  <h1>~ loading resources :3 ~</h1>
+  <img id="ritsu-gif" src="./ritsu.gif" alt="ritsu" width="200" height="200" style="margin-bottom: 24px;">
+
+  <div id="project-links">
+    <a href="https://github.com/wszqkzqk/PvZ-Portable" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="https://github.com/wszqkzqk/PvZ-Portable/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+    <a href="https://github.com/wszqkzqk/PvZ-Portable/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+  </div>
+
+  <!-- file-row progress entries injected by JS -->
+  <div id="server-load-wrap"></div>
+
+  <p id="resources-ready-msg">all resources ready ✓</p>
+  <div id="loading-drop-zone"></div>
+
+  <!-- hidden button kept for compatibility, but auto-start is active -->
+  <button id="launch-btn" style="display:none">Play Now</button>
+
+  <div id="upload-save-actions">
+    <button id="upload-save-import-btn">Import Save ZIP</button>
+    <button id="upload-save-import-dir-btn">Import Save Folder</button>
+    <button id="upload-save-clear-btn">Clear Browser Saves</button>
+  </div>
+  <input id="upload-save-import-input" type="file" style="display:none" accept=".zip">
+  <input id="upload-save-import-dir-input" type="file" style="display:none" multiple webkitdirectory>
+
+  <p style="margin-top:1em">Community-driven re-implementation for <strong>all desktop, mobile, and web</strong>.<br>Not affiliated with PopCap Games or Electronic Arts.</p>
+  <p style="margin-top:.5em">All game resources are fetched from the server — nothing is uploaded. Saves are stored locally via IndexedDB.</p>
+  <p style="margin-top:.5em">Copyright &copy; 2026 Zhou Qiankang &lt;<a href="mailto:wszqkzqk@qq.com" style="color:#ff79c6">wszqkzqk@qq.com</a>&gt;</p>
+</div>
+
+<div id="canvas-container">
+  <div id="save-toolbar">
+    <button id="save-export-btn">💾 Export Saves</button>
+  </div>
+  <canvas id="canvas" width="800" height="600" tabindex="0"></canvas>
+</div>
+<textarea id="pvz-soft-keyboard" autocapitalize="off" autocomplete="off" autocorrect="off" enterkeyhint="done" spellcheck="false"></textarea>
+
+<script>
+window.moduleReadyPromise = new Promise((n, e) => { window._resolveModuleReady = n; window._rejectModuleReady = e; });
+var Module = {
+  canvas: document.getElementById("canvas"),
+  noInitialRun: true,
+  onRuntimeInitialized: function() { window._resolveModuleReady(); },
+  onAbort: function(n) { window._rejectModuleReady(new Error(n)); },
+  print: function(n) { console.log(n); },
+  printErr: function(n) { console.warn(n); }
+};
+</script>
+<script src="pvz-portable.js" async></script>
+<script>"use strict";
+
+// ----------------------------------------------------------------------
+// PvZ Portable Loader — AUTO-START MODE
+// Once all resources (pak parts + properties) are fetched AND the WASM
+// runtime is ready, the game starts automatically without requiring
+// manual button click.
+// ----------------------------------------------------------------------
+
+const PAK_PARTS = ["main.pak.part0","main.pak.part1","main.pak.part2"];
+const PROPERTIES_FILES = [
+  "properties/Layout.xml","properties/default.xml","properties/partner.xml",
+  "properties/partner.xml.sig","properties/partner_logo.jpg"
+];
+
+const collectedFiles = new Map();
+let savesMounted = false;
+let gameStarted = false;
+let saveSyncIntervalId = null;
+let saveSyncInFlight = null;
+let saveSyncQueued = false;
+let lastSaveSyncAt = 0;
+let saveFsReadyPromise = null;
+let allResourcesReady = false;
+let runtimeReloadScheduled = false;
+let wasmReady = false;
+let autoStartTriggered = false;
+
+const serverLoadWrap   = document.getElementById("server-load-wrap");
+const loadStatus       = document.getElementById("loading-drop-zone");
+const resourcesReadyMsg= document.getElementById("resources-ready-msg");
+const launchBtn        = document.getElementById("launch-btn");
+const uploadSaveImportBtn    = document.getElementById("upload-save-import-btn");
+const uploadSaveImportDirBtn = document.getElementById("upload-save-import-dir-btn");
+const uploadSaveClearBtn     = document.getElementById("upload-save-clear-btn");
+const uploadSaveImportInput    = document.getElementById("upload-save-import-input");
+const uploadSaveImportDirInput = document.getElementById("upload-save-import-dir-input");
+
+// ── File-row UI helpers ──────────────────────────────────────────────────
+function makeFileRow(label) {
+  const row = document.createElement("div");
+  row.className = "file-row";
+  const nameEl   = document.createElement("span");
+  nameEl.className = "file-name";
+  nameEl.textContent = label + ":";
+  const statusEl = document.createElement("span");
+  statusEl.className = "file-status pending";
+  statusEl.textContent = "waiting...";
+  row.appendChild(nameEl);
+  row.appendChild(statusEl);
+  serverLoadWrap.appendChild(row);
+  return {
+    setProgress(pct) { statusEl.textContent = Math.round(pct) + "%"; },
+    setDone(sizeBytes) {
+      statusEl.textContent = sizeBytes != null
+        ? "done ✓ (" + (sizeBytes/1048576).toFixed(1) + " MB)"
+        : "done ✓";
+      statusEl.classList.add("done");
+    },
+    setError(msg) {
+      statusEl.textContent = "✗ error";
+      statusEl.classList.add("error");
+      row.title = msg;
+    }
+  };
+}
+
+// ── Fetch with progress ──────────────────────────────────────────────────
+async function fetchWithProgress(url, onProgress) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error("HTTP " + resp.status + " for " + url);
+  const total = parseInt(resp.headers.get("content-length") || "0", 10);
+  const reader = resp.body.getReader();
+  const chunks = []; let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); received += value.length;
+    if (total > 0) onProgress(received / total * 100);
+  }
+  const out = new Uint8Array(received); let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.length; }
+  return out.buffer;
+}
+
+// ── Fetch & merge main.pak ───────────────────────────────────────────────
+async function fetchPak() {
+  const row = makeFileRow("main.pak");
+  try {
+    const buffers = [];
+    for (let i = 0; i < PAK_PARTS.length; i++) {
+      row.setProgress((i / PAK_PARTS.length) * 100);
+      const buf = await fetchWithProgress(PAK_PARTS[i], pct => {
+        row.setProgress((i / PAK_PARTS.length) * 100 + pct / PAK_PARTS.length);
+      });
+      buffers.push(buf);
+    }
+    const total = buffers.reduce((s, b) => s + b.byteLength, 0);
+    const merged = new Uint8Array(total); let off = 0;
+    for (const b of buffers) { merged.set(new Uint8Array(b), off); off += b.byteLength; }
+    collectedFiles.set("main.pak", new File([merged], "main.pak", { type: "application/octet-stream" }));
+    row.setDone(total);
+  } catch(e) { row.setError(e.message); throw e; }
+}
+
+// ── Fetch properties/ files ──────────────────────────────────────────────
+async function fetchProperties() {
+  const promises = PROPERTIES_FILES.map(async path => {
+    const row = makeFileRow(path);
+    try {
+      const buf = await fetchWithProgress(path, pct => row.setProgress(pct));
+      collectedFiles.set(path, new File([buf], path.split("/").pop(), { type: "application/octet-stream" }));
+      row.setDone(buf.byteLength);
+    } catch(e) { row.setError(e.message); throw e; }
+  });
+  await Promise.all(promises);
+}
+
+// ── Kick off all fetches ─────────────────────────────────────────────────
+async function fetchAllResources() {
+  try {
+    await Promise.all([fetchPak(), fetchProperties()]);
+    allResourcesReady = true;
+    resourcesReadyMsg.style.display = "block";
+    // Auto-start will be triggered when both resources and WASM are ready
+    tryAutoStart();
+  } catch(e) {
+    loadStatus.textContent = "⚠ Failed to load resources: " + e.message;
+    loadStatus.classList.add("has-error");
+    loadStatus.style.display = "block";
+  }
+}
+
+// ── Save FS helpers ──────────────────────────────────────────────────────
+function canSyncSaves(){return savesMounted&&Module.FS&&"function"==typeof Module.FS.syncfs}
+async function ensureSaveFsReady(){return saveFsReadyPromise||(saveFsReadyPromise=(async()=>{await window.moduleReadyPromise;try{Module.FS.mkdir("/saves")}catch(e){}try{Module.FS.mount(Module.FS.filesystems.IDBFS,{},"/saves")}catch(e){}savesMounted=true;await new Promise(r=>Module.FS.syncfs(true,t=>{if(t)console.warn("IDBFS sync error:",t);r()}));lastSaveSyncAt=Date.now()})(),saveFsReadyPromise)}
+async function syncSaves(){if(!canSyncSaves())return;if(saveSyncInFlight)return saveSyncQueued=true,saveSyncInFlight;saveSyncInFlight=new Promise(r=>Module.FS.syncfs(false,t=>{if(t)console.warn("IDBFS persist error:",t);else lastSaveSyncAt=Date.now();r()}));try{await saveSyncInFlight}finally{saveSyncInFlight=null;if(saveSyncQueued){saveSyncQueued=false;syncSaves()}}}
+function startSaveAutosync(){if(saveSyncIntervalId===null)saveSyncIntervalId=window.setInterval(syncSaves,5000)}
+
+// ── Canvas resize ────────────────────────────────────────────────────────
+function resizeCanvas(){
+  const c=document.getElementById("canvas"),ct=document.getElementById("canvas-container");
+  const s=Math.min(ct.clientWidth/c.width,ct.clientHeight/c.height);
+  c.style.width=Math.floor(c.width*s)+"px"; c.style.height=Math.floor(c.height*s)+"px";
+}
+
+// ── AUTO-START: condition check (resources + wasm) ───────────────────────
+function tryAutoStart() {
+  if (autoStartTriggered) return;
+  if (!allResourcesReady || !wasmReady) {
+    // wait for both
+    return;
+  }
+  autoStartTriggered = true;
+  // slight microtask delay to ensure DOM updates
+  Promise.resolve().then(() => startGame());
+}
+
+// ── Game launch (automatic) ──────────────────────────────────────────────
+async function startGame() {
+  if (gameStarted) return;
+  if (!allResourcesReady) {
+    console.warn("auto-start: resources not ready");
+    return;
+  }
+  // Disable any leftover manual launch button just in case
+  if (launchBtn) launchBtn.disabled = true;
+  loadStatus.textContent = "preparing WebAssembly runtime & resources…";
+  loadStatus.classList.remove("has-error");
+  loadStatus.style.display = "block";
+  try {
+    await window.moduleReadyPromise;
+    // Write all fetched files into virtual FS
+    const entries = Array.from(collectedFiles.entries());
+    let written = 0;
+    const totalBytes = entries.reduce((s,[,f])=>s+f.size,0);
+    for (let i=0;i<entries.length;i++) {
+      const [path,file]=entries[i];
+      loadStatus.textContent="writing resources… "+(i+1)+"/"+entries.length+", "+(written/1048576).toFixed(1)+"/"+(totalBytes/1048576).toFixed(1)+" MiB";
+      const data=new Uint8Array(await file.arrayBuffer());
+      const parts=path.split("/"); let dir="/";
+      for(let d=0;d<parts.length-1;d++){dir+=(dir==="/"?"":"/")+parts[d];try{Module.FS.mkdir(dir)}catch(e){}}
+      Module.FS.writeFile("/"+path,data); written+=file.size;
+      if((i+1)%4===0)await new Promise(r=>setTimeout(r,0));
+    }
+    loadStatus.textContent = "restoring saved data…";
+    await ensureSaveFsReady();
+    // Switch UI to game mode
+    document.body.classList.replace("upload-mode","game-mode");
+    document.getElementById("upload-screen").style.display = "none";
+    const cc = document.getElementById("canvas-container");
+    cc.style.display = "flex";
+    resizeCanvas();
+    window.addEventListener("resize",resizeCanvas);
+    loadStatus.style.display = "none";
+    gameStarted = true;
+    lastSaveSyncAt = Date.now();
+    startSaveAutosync();
+    // Finally launch the game main loop
+    Module.callMain([]);
+  } catch(e) {
+    console.error("Failed to start game:", e);
+    loadStatus.textContent = "Error: "+(e.message||e);
+    loadStatus.classList.add("has-error");
+    document.getElementById("canvas-container").style.display = "none";
+    document.getElementById("upload-screen").style.display = "";
+    document.body.classList.replace("game-mode","upload-mode");
+    if (launchBtn) launchBtn.disabled = false;
+    autoStartTriggered = false; // allow retry maybe if user manually reloads? but better to show error
+  }
+}
+
+// Listen for WASM runtime ready event
+window.moduleReadyPromise.then(() => {
+  wasmReady = true;
+  tryAutoStart();
+}).catch(err => {
+  console.error("WASM runtime failed:", err);
+  loadStatus.textContent = "⚠ WebAssembly runtime error: " + (err.message || err);
+  loadStatus.classList.add("has-error");
+  loadStatus.style.display = "block";
+});
+
+// Start fetching resources immediately
+fetchAllResources();
+
+// Optional fallback: in case auto-start didn't trigger (safety), but we don't show manual button.
+// The launchBtn is hidden but we keep it for completeness. Not required.
+
+// ── Save management ──────────────────────────────────────────────────────
+function collectSaveFiles(e){const t=[];let n;try{n=Module.FS.readdir(e)}catch(e){return t}for(const a of n){if("."===a||".."===a)continue;const n=e+"/"+a,o=Module.FS.stat(n);Module.FS.isDir(o.mode)?t.push(...collectSaveFiles(n)):t.push(n)}return t}
+
+async function exportSaves(){const e=document.getElementById("save-export-btn");e.disabled=true;e.textContent="⏳ Exporting…";try{await ensureSaveFsReady();await syncSaves();const f=collectSaveFiles("/saves/userdata");if(!f.length)return void alert("No save data found.");const z=new JSZip;for(const p of f)z.file(p.replace(/^\/saves\//,""),Module.FS.readFile(p));const b=await z.generateAsync({type:"blob"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="pvz-portable-savedata.zip";a.click();URL.revokeObjectURL(a.href)}catch(e){console.error("Export failed:",e);alert("Export failed: "+e.message)}finally{e.disabled=false;e.textContent="💾 Export Saves"}}
+
+function normalizeSaveImportPath(e){const t=e.replace(/\\/g,"/").replace(/^\/+/,"").split("/").filter(Boolean);if(!t.length)return"";const n=t.indexOf("userdata");return n>=0?t.slice(n+1).join("/"):t.length>1?t.slice(1).join("/"):t[0]}
+
+async function importSaves(e,t){await ensureSaveFsReady();t.disabled=true;const n=t.textContent;t.textContent="⏳ Importing…";try{const z=await JSZip.loadAsync(e),keys=Object.keys(z.files).filter(k=>!z.files[k].dir);for(const k of keys){let p=k;p.startsWith("userdata/")||(p="userdata/"+p);const full="/saves/"+p,parts=full.split("/");let dir="";for(let i=1;i<parts.length-1;i++){dir+="/"+parts[i];try{Module.FS.mkdir(dir)}catch(e){}}Module.FS.writeFile(full,await z.files[k].async("uint8array"))}await syncSaves()}catch(e){console.error("Import failed:",e);alert("Import failed: "+e.message)}finally{t.disabled=false;t.textContent=n}}
+
+async function importSaveDirectory(files,btn){await ensureSaveFsReady();btn.disabled=true;const n=btn.textContent;btn.textContent="⏳ Importing…";try{for(const f of files){const rel=normalizeSaveImportPath(f.webkitRelativePath||f.name);if(!rel)continue;const full="/saves/userdata/"+rel,parts=full.split("/");let dir="";for(let i=1;i<parts.length-1;i++){dir+="/"+parts[i];try{Module.FS.mkdir(dir)}catch(e){}}Module.FS.writeFile(full,new Uint8Array(await f.arrayBuffer()))}await syncSaves()}catch(e){console.error("Folder import failed:",e);alert("Save folder import failed: "+e.message)}finally{btn.disabled=false;btn.textContent=n}}
+
+async function clearSaves(btn){if(!(await ensureSaveFsReady(),confirm("This will permanently delete ALL save data from your browser.\nThis cannot be undone. Continue?")))return;btn.disabled=true;const n=btn.textContent;btn.textContent="⏳ Clearing…";try{const files=collectSaveFiles("/saves");for(const f of files)try{Module.FS.unlink(f)}catch(e){}function rmdir(d){let ls;try{ls=Module.FS.readdir(d)}catch(e){return}for(const e of ls){if("."===e||".."===e)continue;const p=d+"/"+e;try{const s=Module.FS.stat(p);Module.FS.isDir(s.mode)&&rmdir(p)}catch(e){}}if(d!=="/saves")try{Module.FS.rmdir(d)}catch(e){}}rmdir("/saves");await syncSaves();alert("All save data has been cleared.")}catch(e){console.error("Clear failed:",e);alert("Clear failed: "+e.message)}finally{btn.disabled=false;btn.textContent=n}}
+
+document.getElementById("save-export-btn").addEventListener("click", exportSaves);
+uploadSaveImportBtn.addEventListener("click", ()=>uploadSaveImportInput.click());
+uploadSaveImportInput.addEventListener("change", e=>{const f=e.target.files[0];f&&importSaves(f,uploadSaveImportBtn);e.target.value="";});
+uploadSaveImportDirBtn.addEventListener("click", ()=>uploadSaveImportDirInput.click());
+uploadSaveImportDirInput.addEventListener("change", async e=>{const f=e.target.files;f&&f.length>0&&await importSaveDirectory(f,uploadSaveImportDirBtn);e.target.value="";});
+uploadSaveClearBtn.addEventListener("click", ()=>clearSaves(uploadSaveClearBtn));
+
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")syncSaves();});
+window.addEventListener("pagehide", syncSaves);
+window.addEventListener("beforeunload", e=>{if(gameStarted){syncSaves();if(Date.now()-lastSaveSyncAt>=7000){e.preventDefault();e.returnValue="Recent save data may still be syncing. Wait a moment or export saves before leaving.";}}});
+
+window.onGameExit = function(){
+  gameStarted=false;
+  if(saveSyncIntervalId!==null){clearInterval(saveSyncIntervalId);saveSyncIntervalId=null;}
+  document.fullscreenElement&&document.exitFullscreen().catch(()=>{});
+  document.getElementById("canvas-container").style.display="none";
+  document.getElementById("upload-screen").style.display="";
+  document.body.classList.replace("game-mode","upload-mode");
+  window.removeEventListener("resize",resizeCanvas);
+  loadStatus.style.display="none";
+  if(launchBtn) launchBtn.disabled=false;
+  if(!runtimeReloadScheduled){runtimeReloadScheduled=true;loadStatus.textContent="Resetting WebAssembly runtime…";loadStatus.classList.remove("has-error");loadStatus.style.display="block";window.setTimeout(()=>window.location.reload(),0);}
+};
+</script>
+</body>
+</html>
